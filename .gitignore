@@ -4,3 +4,7 @@
 TODO
 uv.lock
 __pycache__
+db/faria.db
+auth/client_secret.json
+auth/gemini.key
+auth/token.pickle
