@@ -1,0 +1,6 @@
+.direnv
+.envrc
+.idea
+TODO
+uv.lock
+__pycache__

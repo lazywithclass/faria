@@ -1,0 +1,14 @@
+[project]
+name = "faria"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "google>=3.0.0",
+    "google-auth-oauthlib>=1.2.1",
+    "google-api-python-client==2.163.0",
+    "google.generativeai==0.8.4",
+    "textual==2.1.2",
+    "textual-dev==1.7.0",
+    "youtube-transcript-api==1.0.2"
+]
