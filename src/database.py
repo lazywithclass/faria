@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 from typing import List, Dict, Optional, Any, Tuple
 
@@ -6,6 +7,7 @@ class VideoDatabase:
     def __init__(self, db_path: str = "db/faria.db"):
         self.db_path = db_path
         self._create_tables_if_not_exist()
+        self.logger = logging.getLogger('faria_logger')
 
     def _create_tables_if_not_exist(self) -> None:
         conn = sqlite3.connect(self.db_path)
@@ -20,7 +22,7 @@ class VideoDatabase:
             summary TEXT,
             watched INTEGER DEFAULT 0,
             disliked INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         ''')
         conn.commit()
@@ -39,7 +41,7 @@ class VideoDatabase:
                 return dict(row)
             return None
         except Exception as e:
-            print(f"Error getting video: {e}")
+            self.logger.error(f"Error getting video: {e}")
             return None
 
     def update_video(self, video_id: str, **kwargs) -> bool:
@@ -63,7 +65,7 @@ class VideoDatabase:
             conn.close()
             return cursor.rowcount > 0
         except Exception as e:
-            print(f"Error updating video: {e}")
+            self.logger.error(f"Error updating video: {e}")
             return False
 
     def get_unwatched_videos(self) -> List[Dict[str, Any]]:
@@ -71,13 +73,13 @@ class VideoDatabase:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            query = 'SELECT * FROM videos WHERE watched = 0 AND disliked = 0 ORDER BY created_at DESC'
+            query = 'SELECT * FROM videos WHERE watched = 0 AND disliked = 0 ORDER BY published_at DESC LIMIT 200'
             cursor.execute(query)
             rows = cursor.fetchall()
             conn.close()
             return [dict(row) for row in rows]
         except Exception as e:
-            print(f"Error getting unwatched videos: {e}")
+            self.logger.error(f"Error getting unwatched videos: {e}")
             return []
 
     def mark_as_watched(self, video_id: str) -> bool:
@@ -92,42 +94,27 @@ class VideoDatabase:
     def add_summary(self, video_id: str, summary: str) -> bool:
         return self.update_video(video_id, summary=summary)
 
-    def add_video(self, video_id: str, channel: str, duration: str, title: str) -> bool:
+    def add_video(self, video_id: str, channel: str, duration: str, title: str, published_at) -> bool:
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            query = 'INSERT OR REPLACE INTO videos(id, channel, duration, title) VALUES (?, ?, ?, ?)'
-            parameters = (video_id, channel, duration, title)
+            query = 'INSERT OR REPLACE INTO videos(id, channel, duration, title, published_at) VALUES (?, ?, ?, ?, ?)'
+            parameters = (video_id, channel, duration, title, published_at)
             cursor.execute(query, parameters)
             conn.commit()
             conn.close()
             return True
         except Exception as e:
-            print(f"Error adding video: {e}")
+            self.logger.error(f"Error adding video: {e}")
             return False
 
     def add_videos(self, videos: List[Dict[str, Any]]) -> bool:
         if not videos:
             return True
-
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            conn.execute('BEGIN TRANSACTION')
             for video in videos:
-                if not all(k in video for k in ['id', 'channel', 'title']):
-                    continue
-                query = 'INSERT INTO videos (id, channel, duration, title) VALUES (?, ?, ?, ?)'
-                parameters = (video['id'], video['channel'], video['duration'], video['title'])
-                cursor.execute(query, parameters)
-            conn.commit()
-            conn.close()
+                self.add_video(video['id'], video['channel'], video['duration'], video['title'], video['published_at'])
             return True
         except Exception as e:
-            print(f"Error adding videos batch: {e}")
-            try:
-                conn.rollback()
-                conn.close()
-            except:
-                pass
+            self.logger.error(f"Error adding videos batch: {e}")
             return False

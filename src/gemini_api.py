@@ -36,7 +36,7 @@ def get_youtube_transcript(video_id):
         text = " ".join([item.text for item in transcript.snippets])
         return text
     except Exception as e:
-        print(f"Error getting transcript: {e}")
+        logger.error(f"Error getting transcript: {e}")
         return None
 
 

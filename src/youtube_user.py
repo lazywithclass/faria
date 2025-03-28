@@ -1,7 +1,9 @@
-from googleapiclient.errors import HttpError
+import logging
+
 from src.utils import get_conf
 
 
+logger = logging.getLogger('faria_logger')
 MAX_RESULTS_PER_PAGE = get_conf('API', 'max_results_per_page')
 
 def get_subscriptions(youtube):
@@ -26,17 +28,23 @@ def get_subscriptions(youtube):
     return channel_ids
 
 
-def get_subscription_feed(youtube):
-    max_results_per_channel = get_conf('API', 'max_videos_to_fetch_per_channel')
+# TODO this should only get videos that are after the last uploaded for each channel
+def get_subscription_feed(youtube, db=None):
     feed_videos = []
     channel_ids = get_subscriptions(youtube)
 
+    # Get list of videos to exclude (watched or disliked)
+    excluded_ids = []
+    if db:
+        excluded_ids = db.get_watched_video_ids() + db.get_disliked_video_ids()
+
     for channel_id in channel_ids:
         try:
+            logger.info(f"Fetching videos for channel {channel_id}")
+            # Get channel uploads playlist
             channels_response = youtube.channels().list(
                 part="contentDetails",
-                id=channel_id,
-                maxResults=max_results_per_channel
+                id=channel_id
             ).execute()
 
             if not channels_response.get('items'):
@@ -44,56 +52,68 @@ def get_subscription_feed(youtube):
 
             uploads_playlist_id = channels_response['items'][0]['contentDetails']['relatedPlaylists']['uploads']
 
-            playlist_response = youtube.playlistItems().list(
-                part="snippet",
-                playlistId=uploads_playlist_id,
-                maxResults=max_results_per_channel
-            ).execute()
+            # Variables for pagination
+            next_page_token = None
+            channel_videos = []
 
-            # Extract video IDs from playlist items
-            video_ids = [item['snippet']['resourceId']['videoId']
-                         for item in playlist_response.get('items', [])]
-
-            if video_ids:
-                # Get video details including duration
-                videos_response = youtube.videos().list(
-                    part="contentDetails",
-                    id=','.join(video_ids)
+            # Loop to get all videos from the playlist using pagination
+            while True:
+                # Get videos from playlist with date filter
+                playlist_response = youtube.playlistItems().list(
+                    part="snippet",
+                    playlistId=uploads_playlist_id,
+                    maxResults=50,  # Maximum allowed by API
+                    pageToken=next_page_token
                 ).execute()
-
-                # Create a mapping of video ID to duration
-                durations = {item['id']: item['contentDetails']['duration']
-                             for item in videos_response.get('items', [])}
 
                 for item in playlist_response.get('items', []):
                     video_id = item['snippet']['resourceId']['videoId']
-                    video_data = {
-                        'id': video_id,
-                        'title': item['snippet']['title'],
-                        'channel': item['snippet']['channelTitle'],
-                        'published_at': item['snippet']['publishedAt'],
-                        'duration': _format_duration(durations.get(video_id, ''))
-                    }
-                    feed_videos.append(video_data)
+                    if video_id not in excluded_ids:
+                        channel_videos.append({
+                            'id': video_id,
+                            'title': item['snippet']['title'],
+                            'channel': item['snippet']['channelTitle'],
+                            'published_at': item['snippet']['publishedAt'],
+                            'duration': ''  # will be populated later
+                        })
+
+                next_page_token = playlist_response.get('nextPageToken')
+                if not next_page_token:
+                    break
+
+            if channel_videos:
+                video_ids = [video['id'] for video in channel_videos]
+                all_durations = {}
+
+                for i in range(0, len(video_ids), 50):
+                    batch = video_ids[i:i + 50]
+                    videos_response = youtube.videos().list(
+                        part="contentDetails",
+                        id=','.join(batch)
+                    ).execute()
+
+                    batch_durations = {item['id']: item['contentDetails']['duration']
+                                       for item in videos_response.get('items', [])}
+                    all_durations.update(batch_durations)
+
+                for video in channel_videos:
+                    video['duration'] = _format_duration(all_durations.get(video['id'], ''))
+
+                feed_videos.extend(channel_videos)
 
         except Exception as e:
-            print(f"Error fetching videos for channel {channel_id}: {e}")
+            logger.error(f"Error fetching videos for channel {channel_id}: {e}")
             continue
 
     feed_videos.sort(key=lambda x: x['published_at'], reverse=True)
-
-    print(f"Found {len(feed_videos)} videos in subscription feed")
     return feed_videos
 
 
 def filter_watched_videos(feed_videos, watched_video_ids):
     unwatched_videos = []
-
     for video in feed_videos:
         if video['id'] not in watched_video_ids:
             unwatched_videos.append(video)
-
-    print(f"Found {len(unwatched_videos)} unwatched videos out of {len(feed_videos)} total videos")
     return unwatched_videos
 
 

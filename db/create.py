@@ -15,7 +15,7 @@ def truncate_videos_table():
                 summary TEXT,
                 watched INTEGER DEFAULT 0,
                 disliked INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         conn.commit()
