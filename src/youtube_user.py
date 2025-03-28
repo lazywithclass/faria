@@ -31,8 +31,6 @@ def get_subscription_feed(youtube):
     feed_videos = []
     channel_ids = get_subscriptions(youtube)
 
-    print(f"Fetching recent videos from {len(channel_ids)} subscribed channels...")
-
     for channel_id in channel_ids:
         try:
             channels_response = youtube.channels().list(

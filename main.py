@@ -1,4 +1,5 @@
 from src.gemini_api import summarize_text, get_youtube_transcript
+from src.logger import setup_logger
 from src.tui import VideoApp
 from src.youtube_auth import get_authenticated_service
 from src.youtube_user import get_subscription_feed
@@ -19,6 +20,5 @@ def run_tui():
     app.run()
 
 if __name__ == "__main__":
-    # get_summary()
+    logger = setup_logger()
     run_tui()
-    # get_videos()

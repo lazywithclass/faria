@@ -66,13 +66,13 @@ class VideoDatabase:
             print(f"Error updating video: {e}")
             return False
 
-    def get_unwatched_videos(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_unwatched_videos(self) -> List[Dict[str, Any]]:
         try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            query = 'SELECT * FROM videos WHERE watched = 0 AND disliked = 0 ORDER BY created_at DESC LIMIT ?'
-            cursor.execute(query, (limit,))
+            query = 'SELECT * FROM videos WHERE watched = 0 AND disliked = 0 ORDER BY created_at DESC'
+            cursor.execute(query)
             rows = cursor.fetchall()
             conn.close()
             return [dict(row) for row in rows]

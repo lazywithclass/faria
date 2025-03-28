@@ -1,3 +1,4 @@
+import logging
 import webbrowser
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
@@ -12,6 +13,8 @@ from src.youtube_user import get_subscription_feed
 from src.database import VideoDatabase
 from src.gemini_api import get_youtube_transcript, summarize_text
 
+
+logger = logging.getLogger('faria_logger')
 
 class VideoPopup(ModalScreen):
 
@@ -48,6 +51,13 @@ class VideoApp(App):
         background: $accent-darken-2;
     }
     
+    .highlight-row {
+        background: $success;
+        color: $text;
+        text-style: bold;
+        transition: background 500ms, color 500ms;
+    }
+    
     Vertical {
         align: center middle;
         padding: 2;
@@ -77,7 +87,8 @@ class VideoApp(App):
     def on_mount(self) -> None:
         table = self.query_one(DataTable)
         table.add_columns("T", "S", "Channel", "Length", "Title")
-        asyncio.create_task(self.task_update_feed())
+        self.unwatched_videos = self._db.get_unwatched_videos()
+        asyncio.create_task(self.task_get_videos())
         asyncio.create_task(self.task_fetch_summary())
 
     async def task_get_videos(self, row=None) -> None:
@@ -90,8 +101,8 @@ class VideoApp(App):
             table.add_row(
                 has_transcript,
                 has_summary,
-                video.get('duration', 'No duration'),
                 video.get('channel', 'No channel'),
+                video.get('duration', 'No duration'),
                 video.get('title', 'No title')
             )
         if row is not None:
@@ -102,9 +113,9 @@ class VideoApp(App):
         while True:
             try:
                 videos = self._db.get_unwatched_videos()
+                videos = [video for video in videos if not video.get('summary')]
                 for video in videos:
                     video_id = video.get('id')
-
                     if video.get('transcription') and video.get('summary'):
                         continue
 
@@ -115,16 +126,16 @@ class VideoApp(App):
                     else:
                         transcript = video.get('transcription')
 
-                    if transcript and not video.get('summary'):
-                        summary = summarize_text(transcript)
-                        if summary:
-                            self._db.add_summary(video_id, summary)
+                    summary = summarize_text(transcript)
+                    if summary:
+                        self._db.add_summary(video_id, summary)
 
                     table = self.query_one(DataTable)
                     row = table.cursor_row
                     await self.task_get_videos(row)
+                    self.highlight_row(row)
 
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(120)
 
                 await asyncio.sleep(30)
 
@@ -133,9 +144,11 @@ class VideoApp(App):
                 await asyncio.sleep(30)
 
     async def task_update_feed(self) -> None:
+        logger.info("Refreshing feed")
         youtube = get_authenticated_service()
         videos = get_subscription_feed(youtube)
         self._db.add_videos(videos)
+        logger.info("Refreshed feed")
         asyncio.create_task(self.task_get_videos())
 
     def action_dislike(self):
@@ -172,3 +185,12 @@ class VideoApp(App):
 
     def action_refresh(self):
         asyncio.create_task(self.task_update_feed())
+
+    # TODO non funzionante
+    async def highlight_row(self, row_index: int, duration: float = 2.0) -> None:
+        table = self.query_one(DataTable)
+        table.add_class("highlight-row", row_index)
+        await asyncio.sleep(duration)
+        if row_index < len(table.rows):
+            table.remove_class("highlight-row", row_index)
+
