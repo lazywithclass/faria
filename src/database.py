@@ -118,3 +118,18 @@ class VideoDatabase:
         except Exception as e:
             self.logger.error(f"Error adding videos batch: {e}")
             return False
+
+    def get_latest_video_date_for_channel(self, channel_name: str) -> Optional[str]:
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            query = 'SELECT MAX(published_at) FROM videos WHERE channel = ?'
+            cursor.execute(query, (channel_name,))
+            result = cursor.fetchone()
+            conn.close()
+            if result and result[0]:
+                return result[0]
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting latest video date for channel {channel_name}: {e}")
+            return None

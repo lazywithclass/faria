@@ -62,3 +62,26 @@ def summarize_text(text):
     except Exception as e:
         logger.error(f"Error in summarize_text: {e}")
         return None
+
+def extended_summarize_text(text):
+    logger.info("extended_summarize_text")
+    try:
+        setup_gemini_api()
+        model = genai.GenerativeModel("gemini-1.5-pro")
+        prompt = f"""
+            What follows is the transcript of a YouTube video, I want you to explain it in more detail.
+            I do not want to read the whole transcript, but I want to know what the video is about 
+            and get the most out of it with a 10 minute read at most.
+            You will format the produced summary to be used in a terminal gui application (TUI).
+
+            Transcript: {text}
+            """
+        response = model.generate_content(prompt)
+        logger.info("extended_summarize_text finished")
+        return response.text
+    except ResourceExhausted as e:
+        logger.error(f"Quota exceeded")
+        return None
+    except Exception as e:
+        logger.error(f"Error in extended_summarize_text: {e}")
+        return None

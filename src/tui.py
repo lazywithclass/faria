@@ -11,7 +11,7 @@ import asyncio
 from src.youtube_auth import get_authenticated_service
 from src.youtube_user import get_subscription_feed
 from src.database import VideoDatabase
-from src.gemini_api import get_youtube_transcript, summarize_text
+from src.gemini_api import get_youtube_transcript, summarize_text, extended_summarize_text
 
 
 logger = logging.getLogger('faria_logger')
@@ -68,6 +68,7 @@ class VideoApp(App):
 
     BINDINGS = [
         Binding("s", "show_details", "Show Details"),
+        Binding("S", "show_extended_details", "Show extended details"),
         Binding("d", "dislike", "Dislike"),
         Binding("q", "quit", "Quit"),
         Binding("r", "refresh", "Refresh"),
@@ -137,11 +138,11 @@ class VideoApp(App):
 
                     await asyncio.sleep(120)
 
-                await asyncio.sleep(30)
+                await asyncio.sleep(120)
 
             except Exception as e:
                 self.log.error(f"Error in background processing: {e}")
-                await asyncio.sleep(30)
+                await asyncio.sleep(120)
 
     async def task_update_feed(self) -> None:
         logger.info("Refreshing feed")
@@ -164,13 +165,22 @@ class VideoApp(App):
         row = table.cursor_row
         video = self.unwatched_videos[row]
         video_id = video.get('id')
-
         summary = video.get('summary')
         if not summary:
             transcript = get_youtube_transcript(video_id)
             summary = summarize_text(transcript)
             self._db.add_transcription(video_id, transcript)
             self._db.add_summary(video_id, summary)
+        self.push_screen(VideoPopup(video_id=video_id, title=video.get('title'), summary=summary))
+
+    def action_show_extended_details(self) -> None:
+        table = self.query_one(DataTable)
+        row = table.cursor_row
+        video = self.unwatched_videos[row]
+        video_id = video.get('id')
+        transcript = get_youtube_transcript(video_id)
+        summary = extended_summarize_text(transcript)
+        self._db.add_transcription(video_id, transcript)
         self.push_screen(VideoPopup(video_id=video_id, title=video.get('title'), summary=summary))
 
     def action_watch(self):

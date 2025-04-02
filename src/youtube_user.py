@@ -1,8 +1,10 @@
 import logging
 
+from src.database import VideoDatabase
 from src.utils import get_conf
 
 
+db = VideoDatabase()
 logger = logging.getLogger('faria_logger')
 MAX_RESULTS_PER_PAGE = get_conf('API', 'max_results_per_page')
 
@@ -29,59 +31,69 @@ def get_subscriptions(youtube):
 
 
 # TODO this should only get videos that are after the last uploaded for each channel
-def get_subscription_feed(youtube, db=None):
+def get_subscription_feed(youtube):
     feed_videos = []
     channel_ids = get_subscriptions(youtube)
 
-    # Get list of videos to exclude (watched or disliked)
-    excluded_ids = []
-    if db:
-        excluded_ids = db.get_watched_video_ids() + db.get_disliked_video_ids()
+    # TODO exclude watched and disliked videos
+
+    logger.info(f"Found {len(channel_ids)} subscriptions")
 
     for channel_id in channel_ids:
         try:
             logger.info(f"Fetching videos for channel {channel_id}")
             # Get channel uploads playlist
             channels_response = youtube.channels().list(
-                part="contentDetails",
+                part="contentDetails,snippet",
                 id=channel_id
             ).execute()
 
             if not channels_response.get('items'):
                 continue
 
-            uploads_playlist_id = channels_response['items'][0]['contentDetails']['relatedPlaylists']['uploads']
+            channel_item = channels_response['items'][0]
+            channel_title = channel_item['snippet']['title']
+            uploads_playlist_id = channel_item['contentDetails']['relatedPlaylists']['uploads']
 
-            # Variables for pagination
+            latest_video_date = db.get_latest_video_date_for_channel(channel_title)
+
             next_page_token = None
             channel_videos = []
+            found_existing = False
 
             # Loop to get all videos from the playlist using pagination
-            while True:
-                # Get videos from playlist with date filter
+            while True and not found_existing:
                 playlist_response = youtube.playlistItems().list(
                     part="snippet",
                     playlistId=uploads_playlist_id,
-                    maxResults=50,  # Maximum allowed by API
+                    maxResults=50,
                     pageToken=next_page_token
                 ).execute()
 
                 for item in playlist_response.get('items', []):
                     video_id = item['snippet']['resourceId']['videoId']
-                    if video_id not in excluded_ids:
-                        channel_videos.append({
-                            'id': video_id,
-                            'title': item['snippet']['title'],
-                            'channel': item['snippet']['channelTitle'],
-                            'published_at': item['snippet']['publishedAt'],
-                            'duration': ''  # will be populated later
-                        })
+                    published_at = item['snippet']['publishedAt']
+
+                    # If we have a latest date and this video is older, we've reached existing content
+                    if latest_video_date and published_at <= latest_video_date:
+                        found_existing = True
+                        logger.info(f"Reached existing content for channel {channel_title}, at {published_at} given {latest_video_date}")
+                        break
+
+                    channel_videos.append({
+                        'id': video_id,
+                        'title': item['snippet']['title'],
+                        'channel': channel_title,  # Use consistent channel name
+                        'published_at': published_at,
+                        'duration': ''  # Will be populated later
+                    })
 
                 next_page_token = playlist_response.get('nextPageToken')
-                if not next_page_token:
+                if not next_page_token or found_existing:
                     break
 
             if channel_videos:
+                # Get video durations in batches of 50
                 video_ids = [video['id'] for video in channel_videos]
                 all_durations = {}
 
@@ -102,19 +114,11 @@ def get_subscription_feed(youtube, db=None):
                 feed_videos.extend(channel_videos)
 
         except Exception as e:
-            logger.error(f"Error fetching videos for channel {channel_id}: {e}")
+            logger.exception(f"Error fetching videos for channel {channel_id}: {e}")
             continue
 
     feed_videos.sort(key=lambda x: x['published_at'], reverse=True)
     return feed_videos
-
-
-def filter_watched_videos(feed_videos, watched_video_ids):
-    unwatched_videos = []
-    for video in feed_videos:
-        if video['id'] not in watched_video_ids:
-            unwatched_videos.append(video)
-    return unwatched_videos
 
 
 def _format_duration(iso_duration):
