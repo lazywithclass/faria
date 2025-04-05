@@ -69,7 +69,7 @@ class VideoApp(App):
     BINDINGS = [
         Binding("s", "show_details", "Show Details"),
         Binding("S", "show_extended_details", "Show extended details"),
-        Binding("d", "dislike", "Dislike"),
+        Binding("d", "ditch", "Ditch"),
         Binding("q", "quit", "Quit"),
         Binding("r", "refresh", "Refresh"),
         Binding("w", "watch", "Watch"),
@@ -152,12 +152,12 @@ class VideoApp(App):
         logger.info("Refreshed feed")
         asyncio.create_task(self.task_get_videos())
 
-    def action_dislike(self):
+    def action_ditch(self):
         table = self.query_one(DataTable)
         row = table.cursor_row
         video = self.unwatched_videos[row]
         video_id = video.get('id')
-        self._db.mark_as_disliked(video_id)
+        self._db.mark_as_ditched(video_id)
         asyncio.create_task(self.task_get_videos(row))
 
     def action_show_details(self) -> None:

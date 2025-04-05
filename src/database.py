@@ -21,7 +21,7 @@ class VideoDatabase:
             transcription TEXT,
             summary TEXT,
             watched INTEGER DEFAULT 0,
-            disliked INTEGER DEFAULT 0,
+            ditched INTEGER DEFAULT 0,
             published_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         ''')
@@ -48,12 +48,12 @@ class VideoDatabase:
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            valid_fields = {'channel', 'title', 'transcription', 'summary', 'watched', 'disliked'}
+            valid_fields = {'channel', 'title', 'transcription', 'summary', 'watched', 'ditched'}
             updates = {k: v for k, v in kwargs.items() if k in valid_fields}
             if not updates:
                 return False
 
-            for key in ['watched', 'disliked']:
+            for key in ['watched', 'ditched']:
                 if key in updates and isinstance(updates[key], bool):
                     updates[key] = 1 if updates[key] else 0
 
@@ -73,7 +73,7 @@ class VideoDatabase:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            query = 'SELECT * FROM videos WHERE watched = 0 AND disliked = 0 ORDER BY published_at DESC LIMIT 200'
+            query = 'SELECT * FROM videos WHERE watched = 0 AND ditched = 0 ORDER BY published_at DESC LIMIT 200'
             cursor.execute(query)
             rows = cursor.fetchall()
             conn.close()
@@ -85,8 +85,8 @@ class VideoDatabase:
     def mark_as_watched(self, video_id: str) -> bool:
         return self.update_video(video_id, watched=True)
 
-    def mark_as_disliked(self, video_id: str) -> bool:
-        return self.update_video(video_id, disliked=True)
+    def mark_as_ditched(self, video_id: str) -> bool:
+        return self.update_video(video_id, ditched=True)
 
     def add_transcription(self, video_id: str, transcription: str) -> bool:
         return self.update_video(video_id, transcription=transcription)
