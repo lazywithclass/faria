@@ -48,7 +48,6 @@ def summarize_text(text):
         prompt = f"""
             What follows is the transcript of a YouTube video, I want you to summarize it.
             Based on this summary I will decide if I want to watch the video or not.
-            You will format the produced summary to be used in a terminal gui application (TUI).
             Prefer short sentences over longer paragraphs.
 
             Transcript: {text}
@@ -72,7 +71,6 @@ def extended_summarize_text(text):
             What follows is the transcript of a YouTube video, I want you to explain it in more detail.
             I do not want to read the whole transcript, but I want to know what the video is about 
             and get the most out of it with a 10 minute read at most.
-            You will format the produced summary to be used in a terminal gui application (TUI).
 
             Transcript: {text}
             """

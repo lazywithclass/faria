@@ -8,3 +8,4 @@ db/faria.db
 auth/client_secret.json
 auth/gemini.key
 auth/token.pickle
+faria.log
