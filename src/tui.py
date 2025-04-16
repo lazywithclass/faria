@@ -141,7 +141,7 @@ class VideoApp(App):
                 await asyncio.sleep(120)
 
             except Exception as e:
-                self.log.error(f"Error in background processing: {e}")
+                logger.error(f"Error in background processing: {e}")
                 await asyncio.sleep(120)
 
     async def task_update_feed(self) -> None:
@@ -171,7 +171,8 @@ class VideoApp(App):
             summary = summarize_text(transcript)
             self._db.add_transcription(video_id, transcript)
             self._db.add_summary(video_id, summary)
-        self.push_screen(VideoPopup(video_id=video_id, title=video.get('title'), summary=summary))
+        title = self.sanitize_title(video.get('title'))
+        self.push_screen(VideoPopup(video_id=video_id, title=title, summary=summary))
 
     def action_show_extended_details(self) -> None:
         table = self.query_one(DataTable)
@@ -181,7 +182,11 @@ class VideoApp(App):
         transcript = get_youtube_transcript(video_id)
         summary = extended_summarize_text(transcript)
         self._db.add_transcription(video_id, transcript)
-        self.push_screen(VideoPopup(video_id=video_id, title=video.get('title'), summary=summary))
+        title = self.sanitize_title(video.get('title'))
+        self.push_screen(VideoPopup(video_id=video_id, title=title, summary=summary))
+
+    def sanitize_title(self, title: str) -> str:
+        return title.replace("!", "")
 
     def action_watch(self):
         table = self.query_one(DataTable)
