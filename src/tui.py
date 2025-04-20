@@ -1,3 +1,4 @@
+import googleapiclient
 import logging
 import webbrowser
 from textual.app import App, ComposeResult
@@ -69,6 +70,7 @@ class VideoApp(App):
     BINDINGS = [
         Binding("s", "show_details", "Show Details"),
         Binding("S", "show_extended_details", "Show extended details"),
+        Binding("a", "add_to_playlist", "Add to playlist"),
         Binding("d", "ditch", "Ditch"),
         Binding("q", "quit", "Quit"),
         Binding("r", "refresh", "Refresh"),
@@ -134,7 +136,6 @@ class VideoApp(App):
                     table = self.query_one(DataTable)
                     row = table.cursor_row
                     await self.task_get_videos(row)
-                    self.highlight_row(row)
 
                     await asyncio.sleep(120)
 
@@ -188,24 +189,71 @@ class VideoApp(App):
     def sanitize_title(self, title: str) -> str:
         return title.replace("!", "")
 
-    def action_watch(self):
+    def action_watch(self, navigate=True):
         table = self.query_one(DataTable)
         row = table.cursor_row
         video = self.unwatched_videos[row]
         video_id = video.get('id')
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        webbrowser.open(url)
+        if navigate:
+            webbrowser.open(f"https://www.youtube.com/watch?v={video_id}")
         self._db.mark_as_watched(video_id)
         asyncio.create_task(self.task_get_videos(row))
 
     def action_refresh(self):
         asyncio.create_task(self.task_update_feed())
 
-    # TODO non funzionante
-    async def highlight_row(self, row_index: int, duration: float = 2.0) -> None:
+    def action_add_to_playlist(self):
         table = self.query_one(DataTable)
-        table.add_class("highlight-row", row_index)
-        await asyncio.sleep(duration)
-        if row_index < len(table.rows):
-            table.remove_class("highlight-row", row_index)
+        row = table.cursor_row
+        video = self.unwatched_videos[row]
+        video_id = video.get('id')
+
+        youtube = get_authenticated_service()
+
+        try:
+            playlists_response = youtube.playlists().list(
+                part="snippet",
+                mine=True
+            ).execute()
+
+            playlist_id = None
+            for item in playlists_response.get('items', []):
+                if item['snippet']['title'] == "faria-next":
+                    playlist_id = item['id']
+                    break
+
+            # Create the playlist if it doesn't exist
+            if not playlist_id:
+                playlist_request = youtube.playlists().insert(
+                    part="snippet,status",
+                    body={
+                        "snippet": {
+                            "title": "faria-next",
+                            "description": "Playlist for next videos to watch",
+                            "tags": ["faria", "next", "videos"],
+                            "defaultLanguage": "en"
+                        },
+                        "status": {
+                            "privacyStatus": "private"
+                        }
+                    }
+                ).execute()
+                playlist_id = playlist_request['id']
+
+            youtube.playlistItems().insert(
+                part="snippet",
+                body={
+                    "snippet": {
+                        "playlistId": playlist_id,
+                        "resourceId": {
+                            "kind": "youtube#video",
+                            "videoId": video_id
+                        }
+                    }
+                }
+            ).execute()
+
+            self.action_watch(navigate=False)
+        except googleapiclient.errors.HttpError as e:
+            logger.error(f"An error occurred: {e}")
 
