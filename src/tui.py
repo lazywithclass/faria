@@ -24,6 +24,8 @@ class VideoPopup(ModalScreen):
     ]
 
     def __init__(self, video_id: str, title: str, summary: str, *args, **kwargs):
+        if not summary:
+            raise ValueError("Summary cannot be empty")
         super().__init__(*args, **kwargs)
         self.video_id = video_id
         self.title = title

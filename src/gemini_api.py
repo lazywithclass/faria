@@ -48,7 +48,9 @@ def summarize_text(text):
         prompt = f"""
             What follows is the transcript of a YouTube video, I want you to summarize it.
             Based on this summary I will decide if I want to watch the video or not.
-            Prefer short sentences over longer paragraphs.
+            The summary should a least have a title, the list of tags, bullet points and a 
+            brief conclusion where you add the "watch this video if" part explaining who and why should watch the video.
+            Prefer short sentences over longer paragraphs, space out the text and use bullet points if possible.
 
             Transcript: {text}
             """
