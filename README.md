@@ -8,7 +8,7 @@
     Often in prison Faria had said to him, when he saw him idle and inactive:
     “Dantès, you must not give way to this listlessness; you will be drowned if you seek to escape, and your strength has not been properly exercised and prepared for exertion.”
     </blockquote>
-    <cite>Abbé Faria</cite>
+    <cite>The Count of Montecristo - Alexandre Dumas</cite>
 </div>
 
 
